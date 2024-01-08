@@ -13,11 +13,10 @@ library(ecmwfr) # For downloading ERA5 data
 # Then save your UID and API key as a vector
 # e.g. CDS_API_UID_KEY <- c("UID", "API_KEY")
 # e.g. save(CDS_API_UID_KEY, file = "metadata/CDS_API_UID_KEY.RData")
-# load("metadata/CDS_API_UID_KEY.RData")
-# cds.key <- CDS_API_UID_KEY[2]
+load("metadata/CDS_API_UID_KEY.RData")
 # NB: This requires your login password for CDS
 # But you only need to run it once
-# wf_set_key(user = CDS_API_UID_KEY[1], key = cds.key, service = "cds")
+# wf_set_key(user = CDS_API_UID_KEY[1], key = CDS_API_UID_KEY[2], service = "cds")
 
 ## Load Copernicus Marine credentials
 # NB: To replicate this file one must first create an account:
@@ -26,6 +25,21 @@ library(ecmwfr) # For downloading ERA5 data
 # e.g. CM_UID_PWD <- c("UID", "password")
 # e.g. save(CM_UID_PWD, file = "metadata/CM_UID_PWD.RData")
 load("metadata/CM_UID_PWD.RData")
+
+# Download ans install Miniforge
+# https://github.com/conda-forge/miniforge
+# NB: One may need to run this in the console after installing
+# source ~/.profile
+
+# To start the environment run:
+# mamba activate cmc-beta
+
+# Then this to insert your username and password for future use
+# eval "copernicus-marine login"
+
+# Basic commands for Copernicus Marine Toolbox
+# https://help.marine.copernicus.eu/en/articles/7972861-copernicus-marine-toolbox-cli-subset
+
 
 
 # ERA5 --------------------------------------------------------------------
@@ -49,6 +63,7 @@ request <- list(
   target = "sval_test.nc"
 )
 
+# NB: This requires your login password for CDS
 wf_request(user = CDS_API_UID_KEY[1],
            request = request,
            transfer = TRUE,
@@ -74,3 +89,33 @@ GLORYS_url <- "https://nrt.cmems-du.eu/thredds/dodsC/cmems_mod_glo_phy-cur_anfc_
 # Open the connection
 ds <- nc_open(GLORYS_url)
 
+# https://catalogue.marine.copernicus.eu/documents/PUM/CMEMS-GLO-PUM-001-030.pdf
+
+# Daily GLORYS from 1993-01-01 to 2021-06-31
+"cmems_mod_glo_phy_my_0.083deg_P1D-m"
+
+# Daily GLORYS from 2021-07-01 to recent time
+"cmems_mod_glo_phy_myint_0.083deg_P1D-m"
+
+
+system("mamba activate cmc-beta")
+system("copernicus-marine subset -i cmems_mod_glo_phy_my_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test.nc")
+"copernicus-marine subset -i cmems_mod_glo_phy_myint_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test.nc"
+
+# Download static values
+"copernicus-marine -i cmems_mod_glo_phy_my_0.083deg_static -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -v e1t -v e2t -v e3t -v mask -v deptho -v deptho_lev -v mdt -o ~/pCloudDrive/FACE-IT_data/GLORYS -f sval_static.nc"
+
+
+# Inspect -----------------------------------------------------------------
+
+# Load a file
+test_GLORYS <- tidync("~/pCloudDrive/FACE-IT_data/GLORYS/test.nc") |> 
+  hyper_tibble() |> 
+  mutate(t = as.Date(as.POSIXct(time*3600, origin = "1950-01-01", tz = "UTC")))
+
+test_GLORYS |> 
+  filter(depth == min(depth), t == min(t)) |> 
+  ggplot(aes(x = longitude, y = latitude)) +
+  geom_raster(aes(fill = uo))
+
+                     
