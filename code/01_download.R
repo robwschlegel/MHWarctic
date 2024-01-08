@@ -5,7 +5,7 @@
 # Setup -------------------------------------------------------------------
 
 source("code/00_functions.R")
-library(ecmwfr) # For downloading ERA5 data
+
 
 ## Set CDS credentials
 # NB: To replicate this file one must first create an account:
@@ -98,12 +98,20 @@ ds <- nc_open(GLORYS_url)
 "cmems_mod_glo_phy_myint_0.083deg_P1D-m"
 
 
-system("mamba activate cmc-beta")
+# system("mamba activate cmc-beta")
 system("copernicus-marine subset -i cmems_mod_glo_phy_my_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test.nc")
-"copernicus-marine subset -i cmems_mod_glo_phy_myint_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test.nc"
+"copernicus-marine subset -i cmems_mod_glo_phy_myint_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test2.nc"
 
 # Download static values
 "copernicus-marine -i cmems_mod_glo_phy_my_0.083deg_static -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -v e1t -v e2t -v e3t -v mask -v deptho -v deptho_lev -v mdt -o ~/pCloudDrive/FACE-IT_data/GLORYS -f sval_static.nc"
+
+
+# Here is a cunning method of generating a brick of year-month values
+date_range <- base::expand.grid(1993:2018, 1:12) %>% 
+  dplyr::rename(year = Var1, month = Var2) %>% 
+  arrange(year, month) %>% 
+  mutate(year_mon = paste0(year,"-",month)) %>% 
+  dplyr::select(year_mon)
 
 
 # Inspect -----------------------------------------------------------------
