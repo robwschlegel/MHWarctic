@@ -1,0 +1,8 @@
+name: R_env
+channels:  
+  - conda-forge
+dependencies:  
+  - pip  
+  - pip:    
+    - copernicus-marine-client!=0.9.10
+  - python>=3.9,<3.12
