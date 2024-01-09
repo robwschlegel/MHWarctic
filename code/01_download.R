@@ -5,7 +5,6 @@
 # Setup -------------------------------------------------------------------
 
 source("code/00_functions.R")
-devtools::install_github("metno/esd")
 
 ## Set CDS credentials
 # NB: To replicate this file one must first create an account:
@@ -28,6 +27,12 @@ load("metadata/CM_UID_PWD.RData")
 
 
 # ERA5 --------------------------------------------------------------------
+
+# Test run
+ERA5.CDS(param = '2m_temperature', varnm = 't2m',
+         it = 2017:2017, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
+         path = "~/pCloudDrive/FACE-IT_data/ERA5/", FNAME = "test.nc", 
+         cleanup = TRUE, verbose = TRUE)
 
 # Set request
 # TODO: Create a list of list to download by year
@@ -58,7 +63,17 @@ wf_request(user = CDS_API_UID_KEY[1],
 
 # GLORYS ------------------------------------------------------------------
 
-# To download these data see the bash script "data/GLORYS_dl.sh"
+# Or rather as a vector
+# NB: Data are download one month at a time
+# So "2022-12-01" gets all of December 2022 data etc.
+dl_dates <- seq(as.Date("1993-01-01"), as.Date("2022-12-01"), by = "month")
+
+# Download daily data in month steps
+# NB: Need about 8 GB RAM per core used
+# Multiple downloads impacts overall download speed
+# But it is still a bit faster on multiple cores
+registerDoParallel(cores = 5)
+plyr::l_ply(dl_dates, dl_GLORYS, .parallel = T)
 
 
 # Inspect -----------------------------------------------------------------

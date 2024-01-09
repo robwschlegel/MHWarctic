@@ -32,7 +32,7 @@ outdir="~/pCloudDrive/FACE-IT_data/GLORYS"
 
 # Product ID and date range
 # NB: Change product ID according to desired dates of data
-productId="cmems_mod_glo_phy_my_0.083deg_P1D-m" # 1993-01-01 to 2021-06-31
+productId="cmems_mod_glo_phy_my_0.083deg_P1D-m" # 1993-01-01 to 2021-06-30
 # productId="cmems_mod_glo_phy_myint_0.083deg_P1D-m" # 2021-07-01 to near present
 
 # Coordinates
@@ -42,7 +42,7 @@ lat=(76 81)
 # Variables
 variable=("thetao" "so" "uo" "vo" "zos" "mlotst" "bottomT" "siconc" "sithick" "usi" "vsi")
 
-for y in {1995..1995}; do
+for y in {1997..1998}; do
   for m in {1..12}; do
     
     startDate=$(date -d "$y-$m-1" +%Y-%m-%d)
