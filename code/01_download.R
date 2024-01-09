@@ -41,7 +41,6 @@ load("metadata/CM_UID_PWD.RData")
 # https://help.marine.copernicus.eu/en/articles/7972861-copernicus-marine-toolbox-cli-subset
 
 
-
 # ERA5 --------------------------------------------------------------------
 
 # Set request
@@ -73,57 +72,30 @@ wf_request(user = CDS_API_UID_KEY[1],
 
 # GLORYS ------------------------------------------------------------------
 
-# We will use the OPeNDAP method to access these data
-
-# creates the OPeNDAP url
-CM_server <- "@nrt.cmems-du.eu"
-datasetID <- "cmems_mod_glo_phy_my_0.083_P1D-m"
-CM_user <- CM_UID_PWD[1]
-CM_pswd <- CM_UID_PWD[2]
-GLORYS_url <- paste0("https://",CM_user,":",CM_pswd,CM_server,"/thredds/dodsC/",datasetID)
-
-GLORYS_url <- "https://nrt.cmems-du.eu/thredds/dodsC/cmems_mod_glo_phy-cur_anfc_0.083deg_P1D-m"
-
-# cmems_mod_glo_phy_my_0.083_P1D-m
-
-# Open the connection
-ds <- nc_open(GLORYS_url)
-
-# https://catalogue.marine.copernicus.eu/documents/PUM/CMEMS-GLO-PUM-001-030.pdf
-
-# Daily GLORYS from 1993-01-01 to 2021-06-31
-"cmems_mod_glo_phy_my_0.083deg_P1D-m"
-
-# Daily GLORYS from 2021-07-01 to recent time
-"cmems_mod_glo_phy_myint_0.083deg_P1D-m"
-
-
-# system("mamba activate cmc-beta")
-system("copernicus-marine subset -i cmems_mod_glo_phy_my_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test.nc")
-"copernicus-marine subset -i cmems_mod_glo_phy_myint_0.083deg_P1D-m -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -z 0. -Z 10. -v uo -v vo -t 2022-01-01 -T 2022-01-03 -o ~/pCloudDrive/FACE-IT_data/GLORYS -f test2.nc"
-
-# Download static values
-"copernicus-marine -i cmems_mod_glo_phy_my_0.083deg_static -x 9.0 -X 35.0 -y 76.0 -Y 81.0 -v e1t -v e2t -v e3t -v mask -v deptho -v deptho_lev -v mdt -o ~/pCloudDrive/FACE-IT_data/GLORYS -f sval_static.nc"
-
-
-# Here is a cunning method of generating a brick of year-month values
-date_range <- base::expand.grid(1993:2018, 1:12) %>% 
-  dplyr::rename(year = Var1, month = Var2) %>% 
-  arrange(year, month) %>% 
-  mutate(year_mon = paste0(year,"-",month)) %>% 
-  dplyr::select(year_mon)
+# To download these data see the bash script "data/GLORYS_dl.sh"
 
 
 # Inspect -----------------------------------------------------------------
 
 # Load a file
-test_GLORYS <- tidync("~/pCloudDrive/FACE-IT_data/GLORYS/test.nc") |> 
+test_GLORYS <- tidync("~/Downloads/mercatorglorys12v1_gl12_mean_19930101_R19930106.nc") |> 
+  hyper_filter(longitude = between(longitude, 0, 5),
+               latitude = between(latitude, 0, 5)) |> 
   hyper_tibble() |> 
   mutate(t = as.Date(as.POSIXct(time*3600, origin = "1950-01-01", tz = "UTC")))
 
+# Load a file
+test_GLORYS <- tidync("~/pCloudDrive/FACE-IT_data/GLORYS/sval_GLORYS_1993-01-01.nc") |> 
+  activate("D2,D1,D3") |> # 2D layers
+  hyper_tibble() |> 
+  mutate(t = as.Date(as.POSIXct(time*3600, origin = "1950-01-01", tz = "UTC")))
+
+# Visualise
 test_GLORYS |> 
-  filter(depth == min(depth), t == min(t)) |> 
+  # filter(depth == min(depth), t == min(t)) |> 
   ggplot(aes(x = longitude, y = latitude)) +
-  geom_raster(aes(fill = uo))
+  geom_raster(aes(fill = sithick)) +
+  scale_fill_viridis_c()
+
 
                      
