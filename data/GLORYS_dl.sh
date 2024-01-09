@@ -1,47 +1,42 @@
 #!/bin/bash
 
+# To download GLORYS data follow these steps:
+
+# 1) Create an account
+# https://data.marine.copernicus.eu/register
+
+# 2) Download and install Miniforge
+# https://github.com/conda-forge/miniforge
+# NB: May need to run this in the console after installing
+# source ~/.profile
+
+# 3) Install the new Copernicus Marine Toolbox
+# https://help.marine.copernicus.eu/en/articles/7970514-copernicus-marine-toolbox-installation
+
+# 4) Startup necessary environment
+# mamba activate cmc-beta
+
+# 5) Run this script in that environment
+# NB: Change directory or file pathway accordingly
+# bash GLORYS_dl.sh
+
+# Note that this script can be replicated in R and run in RStudio:
+# https://help.marine.copernicus.eu/en/articles/8638253-how-to-download-data-via-the-copernicus-marine-toolbox-in-r
+
 # Output directory
 outdir="~/pCloudDrive/FACE-IT_data/GLORYS"
 
-# Dataset ID and date range
+# Product ID and date range
+# NB: Change product ID according to desired dates of data
 productId="cmems_mod_glo_phy_my_0.083deg_P1D-m" # 1993-01-01 to 2021-06-31
-# startDate=$(date -d "1993-01-03" +%Y-%m-%d)
-# endDate=$(date -d "1993-01-01" +%Y-%m-%d) # For testing
-# endDate=$(date -d "1993-01-31" +%Y-%m-%d)
-# endDate=$(date -d "2021-06-31" +%Y-%m-%d)
 # productId="cmems_mod_glo_phy_myint_0.083deg_P1D-m" # 2021-07-01 to near present
-# startDate=$(date -d "2021-07-01" +%Y-%m-%d)
-# endDate=$(date -d "2022-12-31" +%Y-%m-%d)
 
 # Coordinates
-lon=(8 35)   #longitude
-lat=(76 81)     #latitude
+lon=(8 35)
+lat=(76 81)
 
 # Variables
 variable=("thetao" "so" "uo" "vo" "zos" "mlotst" "bottomT" "siconc" "sithick" "usi" "vsi")
-
-# time step
-# addDays=1
-
-# endDate=$(date -d "$endDate + $addDays days" +%Y-%m-%d)
-
-# Time range loop
-# while [[ "$startDate" != "$endDate" ]]; do
-# 
-#     echo "=============== Date: $startDate ===================="
-# 
-#     command="copernicus-marine subset -i $productId \
-#     -x ${lon[0]} -X ${lon[1]} -y ${lat[0]} -Y ${lat[1]} -z 0. -Z 5000.\
-#     -v ${variable[0]} -v ${variable[1]} -v ${variable[2]} -v ${variable[3]} -v ${variable[4]} -v ${variable[5]} -v ${variable[6]} -v ${variable[7]} -v ${variable[8]} -v ${variable[9]} -v ${variable[10]} \
-#     -t \"$startDate\" -T \"$startDate\" \
-#     --force-download -o $outdir --overwrite-output-data -f sval_GLORYS_$(date -d "$startDate" +%Y-%m-%d).nc"
-# 
-#     echo -e "$command \n============="
-#     eval "$command"
-# 
-#     startDate=$(date -d "$startDate + $addDays days" +%Y-%m-%d)
-# 
-# done
 
 for y in {1993..1993}; do
   for m in {6..12}; do
@@ -60,7 +55,7 @@ for y in {1993..1993}; do
 
     echo -e "$command \n============="
     eval "$command"
-    echo "=========== Download completed! ==========="
+    echo "=========== Download completed! ===========\n"
     
   done
 done
