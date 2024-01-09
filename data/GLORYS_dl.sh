@@ -42,7 +42,7 @@ lat=(76 81)
 # Variables
 variable=("thetao" "so" "uo" "vo" "zos" "mlotst" "bottomT" "siconc" "sithick" "usi" "vsi")
 
-for y in {1994..1994}; do
+for y in {1995..1995}; do
   for m in {1..12}; do
     
     startDate=$(date -d "$y-$m-1" +%Y-%m-%d)
