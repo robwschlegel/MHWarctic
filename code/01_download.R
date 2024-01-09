@@ -5,7 +5,7 @@
 # Setup -------------------------------------------------------------------
 
 source("code/00_functions.R")
-
+devtools::install_github("metno/esd")
 
 ## Set CDS credentials
 # NB: To replicate this file one must first create an account:
