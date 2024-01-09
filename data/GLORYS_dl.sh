@@ -12,9 +12,13 @@
 
 # 3) Install the new Copernicus Marine Toolbox
 # https://help.marine.copernicus.eu/en/articles/7970514-copernicus-marine-toolbox-installation
+# Basic commands, FYI
+# https://help.marine.copernicus.eu/en/articles/7972861-copernicus-marine-toolbox-cli-subset
 
 # 4) Startup necessary environment
 # mamba activate cmc-beta
+# And insert your username and password for future use
+# eval "copernicus-marine login"
 
 # 5) Run this script in that environment
 # NB: Change directory or file pathway accordingly
@@ -38,8 +42,8 @@ lat=(76 81)
 # Variables
 variable=("thetao" "so" "uo" "vo" "zos" "mlotst" "bottomT" "siconc" "sithick" "usi" "vsi")
 
-for y in {1993..1993}; do
-  for m in {6..12}; do
+for y in {1994..1994}; do
+  for m in {1..12}; do
     
     startDate=$(date -d "$y-$m-1" +%Y-%m-%d)
     endDate=$(date -d "$y-$m-1 + 1 month - 1 day" +%Y-%m-%d)

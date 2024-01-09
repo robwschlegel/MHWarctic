@@ -26,20 +26,6 @@ load("metadata/CDS_API_UID_KEY.RData")
 # e.g. save(CM_UID_PWD, file = "metadata/CM_UID_PWD.RData")
 load("metadata/CM_UID_PWD.RData")
 
-# Download ans install Miniforge
-# https://github.com/conda-forge/miniforge
-# NB: One may need to run this in the console after installing
-# source ~/.profile
-
-# To start the environment run:
-# mamba activate cmc-beta
-
-# Then this to insert your username and password for future use
-# eval "copernicus-marine login"
-
-# Basic commands for Copernicus Marine Toolbox
-# https://help.marine.copernicus.eu/en/articles/7972861-copernicus-marine-toolbox-cli-subset
-
 
 # ERA5 --------------------------------------------------------------------
 
