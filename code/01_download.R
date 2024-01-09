@@ -36,7 +36,7 @@ ERA5_vars <- c('2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_
 
 # Test run
 ERA5.CDS(param = '2m_temperature', varnm = 't2m',
-         it = 2017:2017, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
+         it = 2016:2016, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
          path = "~/pCloudDrive/FACE-IT_data/ERA5/",
          cleanup = TRUE, verbose = TRUE)
 
