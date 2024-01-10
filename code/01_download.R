@@ -31,7 +31,7 @@ load("metadata/CM_UID_PWD.RData")
 # Test run
 ERA5.CDS(param = '2m_temperature', varnm = 't2m',
          it = 2017:2017, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
-         path = "~/pCloudDrive/FACE-IT_data/ERA5/", FNAME = "test.nc", 
+         path = "~/pCloudDrive/FACE-IT_data/ERA5/", 
          cleanup = TRUE, verbose = TRUE)
 
 # Set request
@@ -73,7 +73,7 @@ dl_dates <- seq(as.Date("1993-01-01"), as.Date("2022-12-01"), by = "month")
 # Multiple downloads impacts overall download speed
 # But it is still a bit faster on multiple cores
 registerDoParallel(cores = 5)
-plyr::l_ply(dl_dates, dl_GLORYS, .parallel = T)
+plyr::l_ply(dl_dates, dl_GLORYS, .parallel = F)
 
 
 # Inspect -----------------------------------------------------------------

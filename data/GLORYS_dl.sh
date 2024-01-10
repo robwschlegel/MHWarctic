@@ -59,7 +59,7 @@ for y in {1997..1998}; do
 
     echo -e "$command \n============="
     eval "$command"
-    echo "=========== Download completed! ===========\n"
+    echo "=========== Download completed! ==========="
     
   done
 done
