@@ -28,10 +28,16 @@ load("metadata/CM_UID_PWD.RData")
 
 # ERA5 --------------------------------------------------------------------
 
+# Variables of interest
+ERA5_vars <- c('2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_wind',  
+               'total_cloud_cover', 'total_precipitation', 'evaporation', 'mean_sea_level_pressure', 
+               'mean_surface_latent_heat_flux', 'mean_surface_sensible_heat_flux',
+               'mean_surface_net_long_wave_radiation_flux', 'mean_surface_net_short_wave_radiation_flux')
+
 # Test run
 ERA5.CDS(param = '2m_temperature', varnm = 't2m',
-         it = 2017:2017, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
-         path = "~/pCloudDrive/FACE-IT_data/ERA5/", 
+         it = 2016:2016, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
+         path = "~/pCloudDrive/FACE-IT_data/ERA5/",
          cleanup = TRUE, verbose = TRUE)
 
 # Set request
@@ -42,15 +48,15 @@ request <- list(
   format = "netcdf",
   variable = "2m_temperature",
   year = "2016",
-  month = "08",
-  day = "16",
+  month = "01",
+  day = "01",
   time = c("00:00", "01:00", "02:00", "03:00", "04:00", "05:00", 
            "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", 
            "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", 
            "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"),
   # area is specified as N, W, S, E
-  area = c(81, 9, 76, 35),
-  target = "sval_test.nc"
+  area = c(81, 8, 76, 35),
+  target = "sval_test1.nc"
 )
 
 # NB: This requires your login password for CDS
@@ -98,5 +104,18 @@ test_GLORYS |>
   geom_raster(aes(fill = sithick)) +
   scale_fill_viridis_c()
 
+# ERA5 hourly download
+test_ERA5 <- tidync("~/pCloudDrive/FACE-IT_data/ERA5/ERA5_t2m_2017_daymean.nc") |> 
+  hyper_tibble()
 
-                     
+# ERA5 data manually created via website
+# https://cds.climate.copernicus.eu/apps/user-apps/app-c3s-daily-era5-statistics?
+test_ERA5_manual <- tidync("~/Downloads/3fc45a57-dee6-47db-8240-3c030401e591.nc") |> 
+  hyper_tibble()
+            
+# Visualise
+test_ERA5 |> 
+  # filter(depth == min(depth), t == min(t)) |> 
+  ggplot(aes(x = longitude, y = latitude)) +
+  geom_raster(aes(fill = t2m)) +
+  scale_fill_viridis_c()
