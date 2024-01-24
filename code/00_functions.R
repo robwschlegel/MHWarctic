@@ -23,6 +23,7 @@ bbox_is <- c(12.97, 17.50, 77.95, 78.90)
 bbox_is_wide <- c(10.0, 18.0, 77.0, 79.0)
 
 # GLORYS files location
+GLORYS_files <- dir("data/GLORYS", pattern = "sval", full.names = TRUE)
 GLORYS_files <- dir("~/pCloudDrive/FACE-IT_data/GLORYS", pattern = "sval", full.names = TRUE)
 
 
@@ -106,10 +107,11 @@ dl_GLORYS <- function(dl_date, dl_range = "month"){
 # Load and extract data from a GLORYS file
 # NB: The lon/lat bbox and other metadata are hard coded here for convenience, change as necessary
 # testers...
-# file_name <- "~/pCloudDrive/FACE-IT_data/GLORYS/sval_GLORYS_1993-01.nc"
-# tidync(file_name)
-# ncdump::NetCDF(file_name)$variable[,1:6]
+# file_name <- "~/pCloudDrive/FACE-IT_data/GLORYS/sval_GLORYS_1998-01.nc"
 load_GLORYS <- function(file_name, wide = FALSE){
+  
+  message(paste0("Began run on ",file_name," at ",Sys.time()))
+  
   # Determine bbox
   if(wide){
     bbox <- bbox_is_wide
@@ -117,6 +119,32 @@ load_GLORYS <- function(file_name, wide = FALSE){
     bbox <- bbox_is
   }
   # Depth vars: temp, U, V, SSS
+  message(paste0("Began loading depth data at ",Sys.time()))
+  nc_file <- nc_open(file_name)
+  nc_lon <- ncdf4::ncvar_get(nc_file, "longitude")
+  nc_lat <- ncdf4::ncvar_get(nc_file, "latitude")
+  lon_idx <- which(nc_file$dim$longitude$vals >= bbox[1] & nc_file$dim$longitude$vals <= bbox[2])
+  lat_idx <- which(nc_file$dim$latitude$vals >= bbox[3] & nc_file$dim$latitude$vals <= bbox[4])
+  # Convenience function for subsetting from a NetCDF
+  ncvar_get_idx <- function(var_name, lon_idx, lat_idx, depth = TRUE){
+    if(depth){
+      start_idx <- c(lon_idx[1], lat_idx[1], 1, 1)
+      count_idx <- c(length(lon_idx), length(lat_idx), -1, -1)
+    } else {
+      start_idx <- c(lon_idx[1], lat_idx[1], 1)
+      count_idx <- c(length(lon_idx), length(lat_idx), -1)
+    }
+    nc_var <- ncvar_get(nc = nc_file, varid = var_name, 
+                        start = start_idx, count = count_idx)
+    return(nc_var)
+  }
+  system.time(
+  nc_temp <- ncvar_get_idx("thetao", lon_idx, lat_idx)
+  )
+  system.time(
+    
+  )
+  
   res1 <- tidync(file_name) |> 
     hyper_filter(longitude = between(longitude, bbox[1], bbox[2]),
                  latitude = between(latitude, bbox[3], bbox[4])) |> 
@@ -130,6 +158,7 @@ load_GLORYS <- function(file_name, wide = FALSE){
            .before = "longitude") |> 
     pivot_longer(temp:cur_dir, names_to = "variable", values_to = "value")
   # Surface vars: MLD, bottomT, SSH, ice variables
+  message(paste0("Began loading surface data at ",Sys.time()))
   res2 <- tidync(file_name) |> 
     activate("D2,D1,D3") |>
     hyper_filter(longitude = between(longitude, bbox_is_wide[1], bbox_is_wide[2]),
@@ -152,6 +181,7 @@ load_GLORYS <- function(file_name, wide = FALSE){
            .before = "longitude") |> 
     pivot_longer(ssh:si_dir, names_to = "variable", values_to = "value")
   # Combine and process
+  message(paste0("Began combining data at ",Sys.time()))
   res <- rbind(res1, res2) |> 
     dplyr::rename(lon = longitude, lat = latitude, t = time) |> 
     mutate(t = as.Date(as.POSIXct(t*3600, origin = '1950-01-01', tz = "GMT"))) |> 
@@ -165,4 +195,17 @@ load_GLORYS <- function(file_name, wide = FALSE){
 
 # I found the CDS API (via R) so cumbersome to work with that I opted to use the web UI
 # and manually download the data, one year at a time
+
+
+# Both --------------------------------------------------------------------
+
+# This function expects to be given only one pixel/ts at a time
+# TODO: Add option to calculate based on 30, 20, and 10 year baselines
+# Both forwards and backwards along the 30 yeaar period of data available
+calc_clim_anom <- function(df, point_accuracy){
+  res <- ts2clm(df, y = val, roundClm = point_accuracy,
+                climatologyPeriod = c("1993-01-01", "2022-12-31"))
+  res$anom <- round(res$val-res$seas, point_accuracy)
+  return(res)
+}
 
