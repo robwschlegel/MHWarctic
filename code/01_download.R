@@ -88,6 +88,16 @@ dl_dates <- seq(as.Date("1993-01-01"), as.Date("2022-12-01"), by = "month")
 registerDoParallel(cores = 5)
 plyr::l_ply(dl_dates, dl_GLORYS, .parallel = F)
 
+# Check for files that didn't come right
+GLORYS_files_size <- file.info(dir("~/pCloudDrive/FACE-IT_data/GLORYS", full.names = T)) |>
+  rownames_to_column(var = "file_name") |>
+  mutate(file_name = sapply(strsplit(file_name, "/"), "[[", 7)) |>
+  mutate(file_date = as.Date(paste0(gsub(".nc", "", sapply(strsplit(file_name, "\\_"), "[[", 3)),"-01")))
+
+# Re-download data as needed
+too_smol <- filter(GLORYS_files_size, size < 200000000)
+if(nrow(too_smol) > 0) plyr::l_ply(too_smol$file_date, dl_GLORYS, .parallel = F, force_dl = TRUE)
+
 
 # Inspect -----------------------------------------------------------------
 

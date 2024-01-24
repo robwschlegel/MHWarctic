@@ -11,25 +11,15 @@ source("code/00_functions.R")
 
 registerDoParallel(cores = 7)
 system.time(
-  is_GLORYS <- load_GLORYS(GLORYS_files[3])
-) # 2 seconds for 1
-system.time(
-  is_GLORYS <- plyr::ldply(GLORYS_files[1:7], load_GLORYS, .parallel = FALSE)
-) # 7 seconds for 7
-system.time(
-  is_GLORYS <- plyr::ldply(GLORYS_files[1:7], load_GLORYS, .parallel = TRUE)
-) # 3 seconds for 7
-system.time(
-  is_GLORYS <- map_dfr(GLORYS_files[1:7], load_GLORYS)
-) # 5 seconds for 7
-
+  is_GLORYS <- plyr::ldply(GLORYS_files, load_GLORYS, .parallel = TRUE)
+) # 99 seconds for 360
 saveRDS(is_GLORYS, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS.Rda")
 is_GLORYS <- readRDS("~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS.Rda")
 
 # test visual
-is_GLORYS |> filter(t == "1993-01-01", variable == "siconc") |> 
+is_GLORYS |> filter(t == "1997-01-01", variable == "siconc") |> 
   ggplot(aes(x = lon, y = lat)) + geom_tile(aes(fill = value)) + scale_fill_viridis_c() +
-  coord_quickmap(xlim = bbox_is_wide[1:2], ylim = bbox_is_wide[3:4], expand = T)
+  coord_quickmap(xlim = bbox_is[1:2], ylim = bbox_is[3:4], expand = T)
 
 # Calculates clims+anoms and save
 registerDoParallel(cores = 7)

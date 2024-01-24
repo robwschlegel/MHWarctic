@@ -82,10 +82,11 @@ ncvar_get_idx <- function(var_name, lon_idx, lat_idx, depth = TRUE){
 # NB: The lon/lat bbox and other metadata are hard coded here for convenience, change as necessary
 # dl_date <- dl_dates[86] # tester...
 # dl_date <- dl_dates[343] # tester...
-dl_GLORYS <- function(dl_date, dl_range = "month"){
+dl_GLORYS <- function(dl_date, dl_range = "month", force_dl = FALSE){
   
   # Set working directories and username+password
-  out_dir <- "~/pCloudDrive/FACE-IT_data/GLORYS" 
+  out_dir <- "~/pCloudDrive/FACE-IT_data/GLORYS"
+  # out_dir <- "data/GLORYS"
   cmt_dir <- "~/miniforge3/envs/R_env/bin/copernicus-marine"
   if(!exists("CM_UID_PWD")) load("metadata/CM_UID_PWD.RData")
   USERNAME <- CM_UID_PWD[1] # Copernicus Marine username
@@ -126,6 +127,8 @@ dl_GLORYS <- function(dl_date, dl_range = "month"){
   }
   out_name <- paste0("sval_GLORYS_",date_file,".nc")
   
+  if(force_dl) file.remove(paste0(out_dir,"/",out_name))
+  
   if(!file.exists(paste0(out_dir,"/",out_name))){
     # NB: If running in R console, replace (cmt_dir, "subset -i" with ("copernicus-marine subset -i"
     command <- paste(cmt_dir,"subset -i", productId,
@@ -142,11 +145,11 @@ dl_GLORYS <- function(dl_date, dl_range = "month"){
 # Load and extract data from a GLORYS file
 # NB: The lon/lat bbox and other metadata are hard coded here for convenience, change as necessary
 # testers...
-# file_name <- GLORYS_files[20]
+# file_name <- GLORYS_files[228]
 load_GLORYS <- function(file_name, wide = FALSE){
   
   # Ready, set, ...
-  message(paste0("Began run on ",file_name," at ",Sys.time()))
+  # message(paste0("Began run on ",file_name," at ",Sys.time()))
   
   # Determine bbox
   if(wide){
@@ -155,7 +158,7 @@ load_GLORYS <- function(file_name, wide = FALSE){
     bbox <- bbox_is
   }
   # Depth vars: temp, U, V, SSS
-  message(paste0("Began loading depth data at ",Sys.time()))
+  # message(paste0("Began loading depth data at ",Sys.time()))
   res1 <- tidync(file_name) |> 
     hyper_filter(longitude = between(longitude, bbox[1], bbox[2]),
                  latitude = between(latitude, bbox[3], bbox[4])) |> 
@@ -170,11 +173,11 @@ load_GLORYS <- function(file_name, wide = FALSE){
     pivot_longer(temp:cur_dir, names_to = "variable", values_to = "value")
   
   # Surface vars: MLD, bottomT, SSH, ice variables
-  message(paste0("Began loading surface data at ",Sys.time()))
+  # message(paste0("Began loading surface data at ",Sys.time()))
   res2 <- tidync(file_name) |> 
     activate("D2,D1,D3") |>
-    hyper_filter(longitude = between(longitude, bbox_is_wide[1], bbox_is_wide[2]),
-                 latitude = between(latitude, bbox_is_wide[3], bbox_is_wide[4])) |> 
+    hyper_filter(longitude = between(longitude, bbox[1], bbox[2]),
+                 latitude = between(latitude, bbox[3], bbox[4])) |> 
     hyper_tibble() |>
     dplyr::rename(mld = mlotst, ssh = zos) |> 
     mutate(depth = 0) |> # Intentionally separate
@@ -194,7 +197,7 @@ load_GLORYS <- function(file_name, wide = FALSE){
     pivot_longer(ssh:si_dir, names_to = "variable", values_to = "value")
   
   # Combine and process
-  message(paste0("Began combining data at ",Sys.time()))
+  # message(paste0("Began combining data at ",Sys.time()))
   res <- rbind(res1, res2) |> 
     dplyr::rename(lon = longitude, lat = latitude, t = time) |> 
     mutate(t = as.Date(as.POSIXct(t*3600, origin = '1950-01-01', tz = "GMT"))) |> 
