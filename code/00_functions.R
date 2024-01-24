@@ -7,10 +7,23 @@
 library(tidyverse)
 library(ncdf4)
 library(tidync)
-library(ecmwfr) # For downloading ERA5 data
-# devtools::install_github("metno/esd")
-library(esd) # For downloading daily ERA5 data
+library(seacarb) # For thetatao conversion
 library(doParallel); registerDoParallel(cores = 15)
+
+# CDS (ERA5) related libraries that weren't used
+# library(ecmwfr) # For downloading ERA5 data
+# devtools::install_github("metno/esd")
+# library(esd) # For downloading daily ERA5 data
+
+
+# Metadata ----------------------------------------------------------------
+
+# Isfjorden bounding box
+bbox_is <- c(12.97, 17.50, 77.95, 78.90)
+bbox_is_wide <- c(10.0, 18.0, 77.0, 79.0)
+
+# GLORYS files location
+GLORYS_files <- dir("~/pCloudDrive/FACE-IT_data/GLORYS", pattern = "sval", full.names = TRUE)
 
 
 # GLORYS ------------------------------------------------------------------
@@ -89,4 +102,67 @@ dl_GLORYS <- function(dl_date, dl_range = "month"){
     system(command, intern = TRUE)
   }
 }
+
+# Load and extract data from a GLORYS file
+# NB: The lon/lat bbox and other metadata are hard coded here for convenience, change as necessary
+# testers...
+# file_name <- "~/pCloudDrive/FACE-IT_data/GLORYS/sval_GLORYS_1993-01.nc"
+# tidync(file_name)
+# ncdump::NetCDF(file_name)$variable[,1:6]
+load_GLORYS <- function(file_name, wide = FALSE){
+  # Determine bbox
+  if(wide){
+    bbox <- bbox_is_wide
+  } else {
+    bbox <- bbox_is
+  }
+  # Depth vars: temp, U, V, SSS
+  res1 <- tidync(file_name) |> 
+    hyper_filter(longitude = between(longitude, bbox[1], bbox[2]),
+                 latitude = between(latitude, bbox[3], bbox[4])) |> 
+    hyper_tibble() |> 
+    dplyr::rename(temp = thetao, sal = so, u = uo, v = vo) |> 
+    mutate(temp = round(temp, 4), sal = round(sal, 4),
+           u = round(u, 6), v = round(v, 6),
+           # Calculate current speed+direction
+           cur_spd = round(sqrt(u^2 + v^2), 4),
+           cur_dir = round((270-(atan2(v, u)*(180/pi)))%%360), 
+           .before = "longitude") |> 
+    pivot_longer(temp:cur_dir, names_to = "variable", values_to = "value")
+  # Surface vars: MLD, bottomT, SSH, ice variables
+  res2 <- tidync(file_name) |> 
+    activate("D2,D1,D3") |>
+    hyper_filter(longitude = between(longitude, bbox_is_wide[1], bbox_is_wide[2]),
+                 latitude = between(latitude, bbox_is_wide[3], bbox_is_wide[4])) |> 
+    hyper_tibble() |>
+    dplyr::rename(mld = mlotst, ssh = zos) |> 
+    mutate(depth = 0) |> # Intentionally separate
+    mutate(bottomT = round(bottomT, 4),
+           siconc = round(siconc, 4), sithick = round(sithick, 4),
+           mld = round(mld, 4), ssh = round(ssh, 4),
+           usi = round(usi, 6), vsi = round(vsi, 6),
+           # Replace NA sea ice values with 0
+           siconc = ifelse(is.na(siconc), 0, siconc),
+           sithick = ifelse(is.na(sithick), 0, sithick),
+           usi = ifelse(is.na(usi), 0, usi),
+           vsi = ifelse(is.na(vsi), 0, vsi),
+           # Calculate sea ice speed+direction
+           si_spd = round(sqrt(usi^2 + vsi^2), 4),
+           si_dir = round((270-(atan2(vsi, usi)*(180/pi)))%%360),
+           .before = "longitude") |> 
+    pivot_longer(ssh:si_dir, names_to = "variable", values_to = "value")
+  # Combine and process
+  res <- rbind(res1, res2) |> 
+    dplyr::rename(lon = longitude, lat = latitude, t = time) |> 
+    mutate(t = as.Date(as.POSIXct(t*3600, origin = '1950-01-01', tz = "GMT"))) |> 
+    dplyr::select(lon, lat, t, depth, variable, value)
+  rm(res1, res2); gc()
+  return(res)
+}
+
+
+# ERA5 --------------------------------------------------------------------
+
+# I found the CDS API (via R) so cumbersome to work with that I opted to use the web UI
+# and manually download the data, one year at a time
 

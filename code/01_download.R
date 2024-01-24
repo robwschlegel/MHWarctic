@@ -28,6 +28,9 @@ load("metadata/CM_UID_PWD.RData")
 
 # ERA5 --------------------------------------------------------------------
 
+# NB: The packages necessary to run the code in this sub-section have been disabled
+# See the 'setup' sub-section in 'code/00_functions.R'
+
 # Variables of interest
 ERA5_vars <- c('2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_wind',  
                'total_cloud_cover', 'total_precipitation', 'evaporation', 'mean_sea_level_pressure', 
@@ -36,7 +39,7 @@ ERA5_vars <- c('2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_
 
 # Test run
 ERA5.CDS(param = '2m_temperature', varnm = 't2m',
-         it = 2016:2016, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
+         it = 2022:2022, lon = c(8, 35), lat = c(76, 81), FUN = 'daymean', 
          path = "~/pCloudDrive/FACE-IT_data/ERA5/",
          cleanup = TRUE, verbose = TRUE)
 
@@ -66,12 +69,16 @@ wf_request(user = CDS_API_UID_KEY[1],
            path = "~/pCloudDrive/FACE-IT_data/ERA5",
            verbose = TRUE)
 
+# Ultimately I wasn't satisfied with any of these approaches and opted to manually download the data
+
 
 # GLORYS ------------------------------------------------------------------
 
-# Or rather as a vector
+# Create sequence of dates to download
 # NB: Data are download one month at a time
 # So "2022-12-01" gets all of December 2022 data etc.
+# NB: As of Jan 2024 these data are only available up to Oct 2023
+# E.g. https://data.marine.copernicus.eu/product/GLOBAL_MULTIYEAR_PHY_001_030/description
 dl_dates <- seq(as.Date("1993-01-01"), as.Date("2022-12-01"), by = "month")
 
 # Download daily data in month steps
@@ -119,3 +126,4 @@ test_ERA5 |>
   ggplot(aes(x = longitude, y = latitude)) +
   geom_raster(aes(fill = t2m)) +
   scale_fill_viridis_c()
+
