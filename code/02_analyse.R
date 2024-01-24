@@ -11,14 +11,18 @@ source("code/00_functions.R")
 
 registerDoParallel(cores = 7)
 system.time(
-  is_GLORYS <- plyr::ldply(GLORYS_files[2], load_GLORYS, .parallel = FALSE)
-) # 2 seconds for 1, xxx seconds for 360 on 7 cores
-system.time(
   is_GLORYS <- load_GLORYS(GLORYS_files[3])
-) # 2 seconds for 1, xxx seconds for 360 on 7 cores
+) # 2 seconds for 1
 system.time(
-  is_GLORYS <- map_dfr(GLORYS_files[4], load_GLORYS)
-) # 2 seconds for 1, xxx seconds for 360 on 7 cores
+  is_GLORYS <- plyr::ldply(GLORYS_files[1:7], load_GLORYS, .parallel = FALSE)
+) # 7 seconds for 7
+system.time(
+  is_GLORYS <- plyr::ldply(GLORYS_files[1:7], load_GLORYS, .parallel = TRUE)
+) # 3 seconds for 7
+system.time(
+  is_GLORYS <- map_dfr(GLORYS_files[1:7], load_GLORYS)
+) # 5 seconds for 7
+
 saveRDS(is_GLORYS, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS.Rda")
 is_GLORYS <- readRDS("~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS.Rda")
 
