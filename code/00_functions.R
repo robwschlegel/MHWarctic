@@ -7,6 +7,7 @@
 library(tidyverse)
 library(ncdf4)
 library(tidync)
+library(heatwaveR)
 library(seacarb) # For thetatao conversion
 library(doParallel); registerDoParallel(cores = 15)
 
@@ -143,6 +144,8 @@ dl_GLORYS <- function(dl_date, dl_range = "month", force_dl = FALSE){
 }
 
 # Load and extract data from a GLORYS file
+# TODO: This could have the clim+anon calculations baked directly in
+# This would save a step in the workflow, and reduce redundant file sizes
 # NB: The lon/lat bbox and other metadata are hard coded here for convenience, change as necessary
 # testers...
 # file_name <- GLORYS_files[228]
@@ -221,7 +224,7 @@ load_GLORYS <- function(file_name, wide = FALSE){
 # testers...
 # base_line <- c("1993-01-01", "2022-12-31")
 calc_clim_anom <- function(df, base_line, point_accuracy){
-  res <- ts2clm(df, y = val, roundClm = point_accuracy,
+  res <- ts2clm(df, y = value, roundClm = point_accuracy,
                 climatologyPeriod = base_line)
   res$anom <- round(res$val-res$seas, point_accuracy)
   return(res)

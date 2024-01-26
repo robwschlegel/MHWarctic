@@ -51,3 +51,6 @@ rsconnect/
 # CDS API key
 metadata/CDS_API_UID_KEY.RData
 metadata/CM_UID_PWD.RData
+
+# large local files
+data/GLORYS
