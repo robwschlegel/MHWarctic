@@ -5,6 +5,7 @@
 # Setup -------------------------------------------------------------------
 
 library(tidyverse)
+library(data.table)
 library(ncdf4)
 library(tidync)
 library(heatwaveR)
@@ -35,15 +36,28 @@ if(file.exists("data/GLORYS/sval_GLORYS_1993-01.nc")){
 
 # Utility -----------------------------------------------------------------
 
-# Useful legacy code used to access variables directly within a NetCDF
-# While this may be faster than tidync, it is much more cumbersome
-# nc_file <- nc_open(file_name)
-# nc_lon <- ncdf4::ncvar_get(nc_file, "longitude")
-# nc_lat <- ncdf4::ncvar_get(nc_file, "latitude")
-# lon_idx <- which(nc_file$dim$longitude$vals >= bbox[1] & nc_file$dim$longitude$vals <= bbox[2])
-# lat_idx <- which(nc_file$dim$latitude$vals >= bbox[3] & nc_file$dim$latitude$vals <= bbox[4])
 # Convenience function for subsetting from a NetCDF
-ncvar_get_idx <- function(var_name, lon_idx, lat_idx, depth = TRUE){
+# While this may be faster than tidync, it is much more cumbersome
+# NB: This isn't set to work with depth data at the moment (i.e. GLORYS)
+ncvar_get_idx <- function(var_name, nc_file, lon_range, lat_range, depth = FALSE){
+  
+  # Find the necessary time shift
+  if(var_name %in% c("mslhf", "msshf", "msnlwrf", "msnswrf")){
+    time_shift = 43200
+  } else{
+    time_shift = 0
+  }
+  
+  # Extract data from NetCDF
+  nc_lon <- ncvar_get(nc_file, "longitude")
+  nc_lat <- ncvar_get(nc_file, "latitude")
+  nc_time <- ncvar_get(nc_file, "time")
+  lon_idx <- which(nc_lon %between% lon_range)
+  lat_idx <- which(nc_lat %between% lat_range)
+  nc_lon_sub <- nc_lon[lon_idx]
+  nc_lat_sub <- nc_lat[lat_idx]
+  
+  # Get subset indices
   if(depth){
     start_idx <- c(lon_idx[1], lat_idx[1], 1, 1)
     count_idx <- c(length(lon_idx), length(lat_idx), -1, -1)
@@ -51,16 +65,27 @@ ncvar_get_idx <- function(var_name, lon_idx, lat_idx, depth = TRUE){
     start_idx <- c(lon_idx[1], lat_idx[1], 1)
     count_idx <- c(length(lon_idx), length(lat_idx), -1)
   }
-  nc_var <- ncvar_get(nc = nc_file, varid = var_name, 
-                      start = start_idx, count = count_idx)
-  return(nc_var)
+  nc_array <- ncvar_get(nc = nc_file, varid = var_name,
+                        start = start_idx, count = count_idx)
+  
+  # Convert to data.frame and exit
+  res_df <- t(as.data.frame(nc_array)) |> 
+    as.data.frame() |> 
+    `colnames<-`(nc_lon_sub) |> 
+    mutate(lat = rep(nc_lat_sub, length(nc_time)),
+           t = rep(nc_time, length(nc_lat_sub))) |> 
+    pivot_longer(cols = c(-lat, -t), names_to = "lon", values_to = "value") |> 
+    mutate(across(everything(), as.numeric)) |> 
+    # mutate(lon = if_else(lon > 180, lon-360, lon)) |>  # Shift to +- 180 scale
+    # na.omit() |>  
+    mutate(t = as.POSIXct(t * 3600, origin = '1900-01-01', tz = "GMT")) |> 
+    mutate(t = t+time_shift) |> # Time shift for heat flux integrals
+    mutate(t = as.Date(t)) |> 
+    mutate(variable = var_name) |> 
+    dplyr::select(lon, lat, t, variable, value)
+  return(res_df)
 }
-# system.time(
-#   nc_temp <- ncvar_get_idx("thetao", lon_idx, lat_idx)
-# )
-# system.time(
-#   nc_vars <- plyr::ldply(c("thetao", "so", "uo"), ncvar_get_idx, .parallel = TRUE, lon_idx = lon_idx, lat_idx = lat_idx)
-# )
+#
 
 
 # GLORYS ------------------------------------------------------------------
@@ -220,6 +245,66 @@ pivot_rds <- function(file_name){
   res <- read_rds(file_name) |> 
     pivot_longer(-c(lon, lat, t), names_to = "variable")
 }
+
+# Function for loading a single ERA 5 NetCDF file
+# The ERA5 data are saved as annual files with all variables
+# testers...
+# file_name <- "~/pCloudDrive/FACE-IT_data/ERA5/is/web_UI_2022.nc"
+# lon_range = c(12.75, 17.50); lat_range = c(78, 79)
+load_ERA5 <- function(file_name, lon_range, lat_range){
+  
+  # Extract data from NetCDF
+  nc_file <- nc_open(file_name)
+  
+  # Get subset of data for all variables
+  # NB: There has to be a better way to do this
+  # But I don't quite understand why this occasionally throws errors
+  # And it doesn't seem possible to reliably test the error case
+  # It may have been multicoring it...
+  error_NA <- NULL
+  while(is.null(error_NA)){
+    error_NA <- "All good"
+    res_df <- tryCatch(plyr::ldply(names(nc_file$var), ncvar_get_idx, .parallel = FALSE,
+                                   nc_file = nc_file, lon_range = lon_range, lat_range = lat_range),
+                       error = function(nc_file) {error_NA <<- NULL})
+  }
+  nc_close(nc_file)
+  
+  # Switch to data.table for faster means
+  res_dt <- data.table(res_df)
+  setkey(res_dt, lon, lat, t, variable)
+  res_mean <- res_dt[, lapply(.SD, mean), by = list(lon, lat, t, variable)]
+  return(res_mean)
+  # rm(file_name, var_name, nc_file, lon_range, lat_range res_array, res_df, res_dt, res_mean); gc()
+}
+
+# Function for processing ERA5 data
+# NB: Not currently used
+# lon_range <- c(12.75, 17.50); lat_range <- c(78, 79) # testers...
+process_ERA5 <- function(file_name, file_prefix, lon_range, lat_range){
+  
+  # The base data rounded to daily
+  # print(paste0("Began loading ",file_df$var_group[1]," at ", Sys.time()))
+  # system.time(
+  res_base <- plyr::ldply(annual_filter(file_df$files, year_range)$file_name, load_ERA5, 
+                          .parallel = FALSE, .paropts = c(.inorder = FALSE),
+                          lon_range = lon_range, lat_range = lat_range)
+  # ) # 2 seconds for 1, 21 for 4, 553 for ~30
+  
+  # Combine the little half days and save
+  print(paste0("Began meaning ",file_df$var_group[1]," at ", Sys.time()))
+  res_dt <- data.table(res_base)
+  setkey(res_dt, lon, lat, t)
+  res_mean <- res_dt[, lapply(.SD, mean), by = list(lon, lat, t)] |> 
+    filter(year(t) <= max(annual_filter(file_df$files, year_range)$year))
+  saveRDS(res_mean, paste0("extracts/",file_prefix,"_ERA5_",file_df$var_group[1],".Rda"))
+  rm(res_base, res_dt, res_mean); gc()
+  return()
+  # rm(file_df, file_prefix, lon_range, lat_range, year_range); gc()
+}
+
+# To change the EA5 coordinates to be the centre of the pixel, rather than the corner
+# mutate(lon = lon+0.125, lat = lat-0.125)
 
 
 # Both --------------------------------------------------------------------

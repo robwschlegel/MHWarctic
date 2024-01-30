@@ -6,7 +6,9 @@
 
 source("code/00_functions.R")
 
-# 
+
+# Process GLORYS ----------------------------------------------------------
+
 # registerDoParallel(cores = 7)
 # system.time(
 #   is_GLORYS <- plyr::ldply(GLORYS_files, load_GLORYS, .parallel = TRUE)
@@ -14,9 +16,6 @@ source("code/00_functions.R")
 # saveRDS(is_GLORYS, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS.Rda")
 # data.table::fwrite(is_GLORYS, "data/GLORYS/is_GLORYS.csv")
 # if(!exists("is_GLORYS")) is_GLORYS <- data.table::fread("data/GLORYS/is_GLORYS.csv"); gc()
-
-
-# Process GLORYS ----------------------------------------------------------
 
 # test visual
 # is_GLORYS |> filter(t == "1997-01-01", variable == "siconc") |> 
@@ -51,9 +50,33 @@ is_GLORYS_anom |> filter(t == "2010-01-18", variable == "siconc") |>
 # These were processed to hourly and saved as .Rda files and loaded here
 # Long term the full data are being downloaded from Copernicus as NetCDF
 
-# Load data
+# File locations
 ERA5_Rda_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", "Rda", full.names = TRUE)
+ERA5_ncdf_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", "nc", full.names = TRUE)
+
+# Load Rda data
 ERA5_Rda <- plyr::ldply(ERA5_Rda_files, pivot_rds, .parallel = TRUE)
-system.time(
-test_ERA5 <- read_rds("~/pCloudDrive/FACE-IT_data/ERA5/is/is_ERA5_T2M.Rda")
-) # 2 seconds to load one
+
+# Date ranges
+ERA5_Rda_date_range <- ERA5_Rda |> 
+  summarise(min_date = min(t), max_date = max(t), .by = "variable")
+
+# Fill in gaps for data not current to 2022-12-31
+
+# Load ERA5 from NetCDF files
+# NB: This will change later...
+ERA5_ncf <- plyr::ldply(ERA5_ncdf_files[14:17], load_ERA5, .parallel = F, .progress = "text",
+                        lon_range = c(12.75, 17.50), lat_range = c(78, 79))
+
+# Combine the little half days
+res_dt <- data.table(res_base)
+setkey(res_dt, lon, lat, t)
+res_mean <- res_dt[, lapply(.SD, mean), by = list(lon, lat, t)] |> 
+  filter(year(t) <= max(annual_filter(file_df$files, year_range)$year))
+
+# Calculate wind speed and direction
+mutate(temp = round(temp, 4), sal = round(sal, 4),
+       u = round(u, 6), v = round(v, 6),
+       cur_spd = round(sqrt(u^2 + v^2), 4),
+       cur_dir = round((270-(atan2(v, u)*(180/pi)))%%360), 
+       .before = "longitude")
