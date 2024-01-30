@@ -261,13 +261,15 @@ load_ERA5 <- function(file_name, lon_range, lat_range){
   # But I don't quite understand why this occasionally throws errors
   # And it doesn't seem possible to reliably test the error case
   # It may have been multicoring it...
-  error_NA <- NULL
-  while(is.null(error_NA)){
-    error_NA <- "All good"
-    res_df <- tryCatch(plyr::ldply(names(nc_file$var), ncvar_get_idx, .parallel = FALSE,
-                                   nc_file = nc_file, lon_range = lon_range, lat_range = lat_range),
-                       error = function(nc_file) {error_NA <<- NULL})
-  }
+  # error_NA <- NULL
+  # while(is.null(error_NA)){
+  #   error_NA <- "All good"
+  #   res_df <- tryCatch(plyr::ldply(names(nc_file$var), ncvar_get_idx, .parallel = FALSE,
+  #                                  nc_file = nc_file, lon_range = lon_range, lat_range = lat_range),
+  #                      error = function(nc_file) {error_NA <<- NULL})
+  # }
+  res_df <- plyr::ldply(names(nc_file$var), ncvar_get_idx, .parallel = FALSE,
+                        nc_file = nc_file, lon_range = lon_range, lat_range = lat_range)
   nc_close(nc_file)
   
   # Switch to data.table for faster means
