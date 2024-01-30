@@ -215,6 +215,12 @@ load_GLORYS <- function(file_name, wide = FALSE){
 # I found the CDS API (via R) so cumbersome to work with that I opted to use the web UI
 # and manually download the data, one year at a time
 
+# Convenience function for loading and pivoting ERA5 Rds files
+pivot_rds <- function(file_name){
+  res <- read_rds(file_name) |> 
+    pivot_longer(-c(lon, lat, t), names_to = "variable")
+}
+
 
 # Both --------------------------------------------------------------------
 

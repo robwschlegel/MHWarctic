@@ -47,4 +47,13 @@ is_GLORYS_anom |> filter(t == "2010-01-18", variable == "siconc") |>
 
 # Process ERA5 ------------------------------------------------------------
 
+# NB: To get things moving more quickly, ERA5 data were accessed from tikoraluk
+# These were processed to hourly and saved as .Rda files and loaded here
+# Long term the full data are being downloaded from Copernicus as NetCDF
 
+# Load data
+ERA5_Rda_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", "Rda", full.names = TRUE)
+ERA5_Rda <- plyr::ldply(ERA5_Rda_files, pivot_rds, .parallel = TRUE)
+system.time(
+test_ERA5 <- read_rds("~/pCloudDrive/FACE-IT_data/ERA5/is/is_ERA5_T2M.Rda")
+) # 2 seconds to load one
