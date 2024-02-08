@@ -115,3 +115,47 @@ ERA5_anom |> filter(t == "2010-01-18", variable == "e") |>
   scale_fill_gradient2(low = "blue", high = "red") +
   coord_quickmap(xlim = bbox_is[1:2], ylim = bbox_is[3:4], expand = T)
 
+
+# Detect MHWs -------------------------------------------------------------
+
+# Load GLORYS data
+if(!exists("is_GLORYS")) is_GLORYS <- data.table::fread("data/GLORYS/is_GLORYS.csv"); gc()
+
+# Extract just temperature
+is_GLORYS_temp <- is_GLORYS |> 
+  filter(variable == "temp") |> 
+  mutate(t = as.Date(t)) |> 
+  pivot_wider(names_from = variable, values_from = value) |> 
+  dplyr::select(lon, lat, depth, t, temp)
+rm(is_GLORYS); gc()
+
+# Detect events per pixel and depth
+# NB: takes a while...
+is_GLORYS_MHW <- is_GLORYS_temp %>%
+  group_by(lon, lat, depth) %>%
+  nest() %>%
+  mutate(clims = map(data, ts2clm,
+                     climatologyPeriod = c("1993-01-01", "2022-12-31")),
+         events = map(clims, detect_event),
+         cats = map(events, category, S = FALSE)) %>%
+  select(-data, -clims)
+rm(is_GLORYS_temp); gc()
+
+# Save
+saveRDS(is_GLORYS_MHW, "data/is_GLORYS_MHW.Rda")
+
+
+# Analyse MHWs ------------------------------------------------------------
+
+# MHW results
+is_GLORYS_events <- readRDS("data/is_GLORYS_MHW.Rda") %>% 
+  select(-cats) %>%
+  unnest(events) %>%
+  filter(row_number() %% 2 == 0) %>%
+  unnest(events)
+
+# Max count of events per pixel and depth
+is_GLORYS_events %>% 
+  group_by(lon, lat, depth) %>% 
+  summarise(count = max(event_no))
+
