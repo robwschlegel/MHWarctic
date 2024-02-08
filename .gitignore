@@ -55,4 +55,5 @@ metadata/CM_UID_PWD.RData
 # large local files
 data/GLORYS
 data/ERA5
+data/*.csv
 

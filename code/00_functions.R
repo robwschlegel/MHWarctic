@@ -36,7 +36,8 @@ if(file.exists("data/GLORYS/sval_GLORYS_1993-01.nc")){
 }
 
 # ERA5 file locations
-ERA5_Rda_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", pattern = "is*", full.names = TRUE)
+# NB: This will change
+ERA5_Rda_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", pattern = "Rda", full.names = TRUE)[2:12]
 ERA5_ncdf_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", "nc", full.names = TRUE)
 
 # GLORYS grid

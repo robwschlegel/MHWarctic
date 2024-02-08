@@ -42,7 +42,7 @@ ERA5_Rda_grid <- dplyr::select(ERA5_Rda, lon, lat) |> distinct()
 
 # Load ERA5 from NetCDF files
 # NB: This will change later...
-ERA5_ncf <- plyr::ldply(ERA5_ncdf_files[14:17], load_ERA5, .parallel = TRUE,
+ERA5_ncf <- plyr::ldply(ERA5_ncdf_files[26:28], load_ERA5, .parallel = TRUE,
                         lon_range = c(12.75, 17.50), lat_range = c(78, 79))
 
 # Combine the little half days
@@ -68,7 +68,8 @@ ERA5_wind <- ERA5_all |>
   pivot_wider(names_from = variable, values_from = value) |> 
   mutate(wind_spd = round(sqrt(u10^2 + v10^2), 4),
          wind_dir = round((270-(atan2(v10, u10)*(180/pi)))%%360)) |> 
-  pivot_longer(u10:wind_dir, names_to = "variable", values_to = "value")
+  dplyr::select(-u10, -v10) |> 
+  pivot_longer(wind_spd:wind_dir, names_to = "variable", values_to = "value")
 is_ERA5 <- rbind(ERA5_all, ERA5_wind); gc()
 
 # Save
@@ -213,77 +214,56 @@ if(!exists("is_GLORYS")) is_GLORYS <- data.table::fread("data/GLORYS/is_GLORYS.c
 if(!exists("is_ERA5")) is_ERA5 <- data.table::fread("data/ERA5/is_ERA5.csv"); gc()
 
 # Pivot wider for merging
-is_GLORYS_wide <- is_GLORYS |> 
+is_GLORYS_wide <- is_GLORYS |> ungroup() |> 
   mutate(depth = case_when(depth < 1 ~ 0, TRUE ~ depth)) |> 
   pivot_wider(names_from = variable, values_from = value) |> 
-  left_join(grid_product_match, by = c("lon" = "lon_G", "lat" = "lat_G"))
-is_ERA5_wide <- is_ERA5 |> mutate(depth = 0) |> 
-  pivot_wider(names_from = variable, values_from = value) |> 
-  left_join(grid_product_match, by = c("lon" = "lon_E", "lat" = "lat_E"))
-
-# Adjust depths for better merging
-# NB: GLORYS depths of 0.49 m are converted to 0 m here
-is_GLORYS$depth <- ifelse(is_GLORYS$depth < 1, 0, is_GLORYS$depth)
-is_ERA5$depth <- 0
+  left_join(grid_product_match[c("lon_G", "lat_G", "lon_E", "lat_E")], by = c("lon" = "lon_G", "lat" = "lat_G"))
+is_ERA5_wide <- is_ERA5 |> ungroup() |> mutate(depth = 0) |> 
+  pivot_wider(names_from = variable, values_from = value) #|> 
+  # NB: Don't join this here as it duplicates pixels to match GLORYS resolution
+  # left_join(grid_product_match, by = c("lon" = "lon_E", "lat" = "lat_E"))
+rm(is_GLORYS, is_ERA5); gc()
 
 # Make the large join
 # NB: This takes a while and a lot of RAM
-# Doesn't like to be done in one go
-is_GLORYS_grid <- left_join(is_GLORYS, grid_product_match, by = c("lon" = "lon_G", "lat" = "lat_G"))
-is_all <- left_join(is_GLORYS_grid, is_ERA5, by = c("lon_E" = "lon", "lat_E" = "lat", "t", "depth"))
-rm(is_GLORYS, is_GLORYS_grid, is_ERA5); gc()
+is_all <- left_join(is_GLORYS_wide, is_ERA5_wide, by = c("lon_E" = "lon", "lat_E" = "lat", "t", "depth")) |> 
+  dplyr::select(-lon_E, -lat_E)
+rm(is_GLORYS_wide, is_ERA5_wide); gc()
 
 # Pivot longer
+# NB: This is very RAM heavy
 is_all_long <- is_all |> 
-  dplyr::rename(lwr = msnlwrf, swr = swr_down, lhf = mslhf, 
+  # NB: For the time being I am not calculating the escape value of SWR out of the MLD
+  # I would need to decide on a Urlov water type for Isfjorden first
+  # mutate(down = msnswrf*((0.67*exp(-mld/1.00))+((1-0.67)*exp(-mld/17.00)))) |> 
+  # mutate(down = replace_na(down, 0),
+  #        swr_down = msnswrf-down) |> 
+  dplyr::rename(lwr = msnlwrf, swr = msnswrf, lhf = mslhf, 
                 shf = msshf, mslp = msl, sst = temp) |> 
-  dplyr::select(-wind_dir, -cur_dir) %>% 
-  mutate(qnet_mld = (qnet*86400)/(mld*1024*4000),
+  # NB: Rather recalculate directions again later from the u/v vectors because directions are in radian values
+  dplyr::select(-wind_dir, -cur_dir) |>
+  mutate(qnet = lwr+swr+lhf+shf,
+         qnet_mld = (qnet*86400)/(mld*1024*4000),
          lwr_mld = (lwr*86400)/(mld*1024*4000),
          swr_mld = (swr*86400)/(mld*1024*4000),
          lhf_mld = (lhf*86400)/(mld*1024*4000),
          shf_mld = (shf*86400)/(mld*1024*4000),
          mld_1 = 1/mld) %>% 
-  pivot_longer(cols = c(-lon, -lat, -depth, -t), names_to = "var", values_to = "val")
-
-# Calculate all clims and anoms
-# Also give better names to the variables
-# Also convert the Qx terms from seconds to days by multiplying by 86,400
-is_all_anom <- ALL_ts %>%
-  dplyr::rename(lwr = msnlwrf, swr = swr_down, lhf = mslhf, 
-                shf = msshf, mslp = msl, sst = temp.y) %>% 
-  dplyr::select(-wind_dir, -cur_dir, -temp.x) %>% 
-  mutate(qnet_mld = (qnet*86400)/(mld*1024*4000),
-         lwr_mld = (lwr*86400)/(mld*1024*4000),
-         swr_mld = (swr*86400)/(mld*1024*4000),
-         lhf_mld = (lhf*86400)/(mld*1024*4000),
-         shf_mld = (shf*86400)/(mld*1024*4000),
-         mld_1 = 1/mld) %>% 
-  pivot_longer(cols = c(-lon, -lat, -depth, -t), names_to = "var", values_to = "val") %>% 
-  group_by(lon, lat, var) %>%
-  nest() %>%
-  mutate(clims = map(data, ts2clm, y = val, roundClm = 10,
-                     climatologyPeriod = c("1993-01-01", "2018-12-25"))) %>% 
-  dplyr::select(-data) %>% 
-  unnest(cols = clims) %>%
-  mutate(anom = val-seas) %>% 
-  ungroup()
-
-# Save
-saveRDS(ALL_ts_anom, "data/ALL_ts_anom.Rda")
-saveRDS(ALL_ts_anom, "shiny/ALL_ts_anom.Rda")
+  pivot_longer(cols = c(-lon, -lat, -t, -depth), names_to = "variable", values_to = "value") |> 
+  filter(!is.na(value))
+rm(is_all); gc()
 
 # Calculates clims+anoms and save
-# is_mini <- filter(is_GLORYS, lon == lon[1], lat == lat[1]) # For testing
+# is_mini <- filter(is_all_long, lon == lon[1], lat == lat[1]) # For testing
+# is_mini_date <- is_mini |> group_by(lon, lat, depth, variable) |> summarise(min_date = min(t), max_date = max(t))
 registerDoParallel(cores = 15)
 system.time(
-  is_all_anom <- plyr::ddply(is_all, c("lon", "lat", "depth", "variable"), calc_clim_anom,
+  is_all_anom <- plyr::ddply(is_all_long, c("lon", "lat", "depth", "variable"), calc_clim_anom,
                              .parallel = T, .paropts = c(.inorder = FALSE),
                              base_line = c("1993-01-01", "2022-12-31"), point_accuracy = 6)
-) # 5 seconds for 1 pixel with 26 depths, 969 seconds for all
-data.table::fwrite(is_all_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv")
-saveRDS(is_all_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_all_anom.Rda")
-if(!exists("is_all_anom")) is_GLORYS_anom <- data.table::fread("~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv"); gc()
+) # 5 seconds for 1 pixel with 26 depths, 721 seconds for all
+data.table::fwrite(is_all_anom, "data/is_all_anom.csv")
+if(!exists("is_all_anom")) is_all_anom <- data.table::fread("data/is_all_anom.csv"); gc()
 
 # test visual
 is_all_anom |> filter(t == "1997-01-01", variable == "siconc") |> 
