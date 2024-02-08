@@ -6,6 +6,8 @@
 
 library(tidyverse)
 library(data.table)
+library(FNN)
+library(geosphere)
 library(ncdf4)
 library(tidync)
 library(heatwaveR)
@@ -32,6 +34,22 @@ if(file.exists("data/GLORYS/sval_GLORYS_1993-01.nc")){
 } else {
   GLORYS_files <- dir("~/pCloudDrive/FACE-IT_data/GLORYS", pattern = "sval", full.names = TRUE)
 }
+
+# ERA5 file locations
+ERA5_Rda_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", pattern = "is*", full.names = TRUE)
+ERA5_ncdf_files <- dir("~/pCloudDrive/FACE-IT_data/ERA5/is", "nc", full.names = TRUE)
+
+# GLORYS grid
+# grid_GLORYS <- load_GLORYS(GLORYS_files[1]) |> dplyr::select(lon, lat) |> distinct()
+# write_csv(grid_GLORYS, "metadata/grid_GLORYS.csv")
+grid_GLORYS <- read_csv("metadata/grid_GLORYS.csv")
+
+# ERA grid
+# grid_ERA5 <- load_ERA5(ERA5_ncdf_files[1], lon_range = c(12.75, 17.50), lat_range = c(78, 79)) |> 
+#   dplyr::select(lon, lat) |> distinct()
+# write_csv(grid_ERA5, "metadata/grid_ERA5.csv")
+grid_ERA5 <- read_csv("metadata/grid_ERA5.csv")
+grid_ERA5_centre <- data.frame(lon = grid_ERA5$lon+0.125, lat = grid_ERA5$lat-0.125)
 
 
 # Utility -----------------------------------------------------------------
@@ -85,8 +103,22 @@ ncvar_get_idx <- function(var_name, nc_file, lon_range, lat_range, depth = FALSE
     dplyr::select(lon, lat, t, variable, value)
   return(res_df)
 }
-#
 
+# Find the nearest grid cells for each site
+## NB: Requires two data.frames with lon, lat in that order
+grid_match <- function(coords_base, coords_match){
+  if(!"lon" %in% colnames(coords_base)) stop("Need lon/lat columns in coords_base")
+  if(!"lon" %in% colnames(coords_match)) stop("Need lon/lat columns in coords_match")
+  coords_match$idx <- 1:nrow(coords_match)
+  grid_index <- data.frame(coords_base,
+                           idx = knnx.index(data = as.matrix(coords_match[,1:2]),
+                                            query = as.matrix(coords_base[,1:2]), k = 1))
+  grid_points <- left_join(grid_index, coords_match, by = c("idx")) %>% 
+    mutate(dist = round(distHaversine(cbind(lon.x, lat.x),
+                                      cbind(lon.y, lat.y))/1000, 2), idx = NULL)
+  return(grid_points)
+}
+#
 
 # GLORYS ------------------------------------------------------------------
 
