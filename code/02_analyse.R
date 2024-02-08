@@ -212,9 +212,39 @@ grid_product_match <- grid_match(grid_GLORYS, grid_ERA5_centre) |>
 if(!exists("is_GLORYS")) is_GLORYS <- data.table::fread("data/GLORYS/is_GLORYS.csv"); gc()
 if(!exists("is_ERA5")) is_ERA5 <- data.table::fread("data/ERA5/is_ERA5.csv"); gc()
 
+# Pivot wider for merging
+is_GLORYS_wide <- is_GLORYS |> 
+  mutate(depth = case_when(depth < 1 ~ 0, TRUE ~ depth)) |> 
+  pivot_wider(names_from = variable, values_from = value) |> 
+  left_join(grid_product_match, by = c("lon" = "lon_G", "lat" = "lat_G"))
+is_ERA5_wide <- is_ERA5 |> mutate(depth = 0) |> 
+  pivot_wider(names_from = variable, values_from = value) |> 
+  left_join(grid_product_match, by = c("lon" = "lon_E", "lat" = "lat_E"))
+
+# Adjust depths for better merging
+# NB: GLORYS depths of 0.49 m are converted to 0 m here
+is_GLORYS$depth <- ifelse(is_GLORYS$depth < 1, 0, is_GLORYS$depth)
+is_ERA5$depth <- 0
+
 # Make the large join
-is_all <- left_join(is_GLORYS, grid_product_match, by = c("lon" = "lon_G", "lat" = "lat_G")) |> 
-  left_join(is_ERA5, by = c("lon" = "lon_E", "lat" = "lat_E", "t"))
+# NB: This takes a while and a lot of RAM
+# Doesn't like to be done in one go
+is_GLORYS_grid <- left_join(is_GLORYS, grid_product_match, by = c("lon" = "lon_G", "lat" = "lat_G"))
+is_all <- left_join(is_GLORYS_grid, is_ERA5, by = c("lon_E" = "lon", "lat_E" = "lat", "t", "depth"))
+rm(is_GLORYS, is_GLORYS_grid, is_ERA5); gc()
+
+# Pivot longer
+is_all_long <- is_all |> 
+  dplyr::rename(lwr = msnlwrf, swr = swr_down, lhf = mslhf, 
+                shf = msshf, mslp = msl, sst = temp) |> 
+  dplyr::select(-wind_dir, -cur_dir) %>% 
+  mutate(qnet_mld = (qnet*86400)/(mld*1024*4000),
+         lwr_mld = (lwr*86400)/(mld*1024*4000),
+         swr_mld = (swr*86400)/(mld*1024*4000),
+         lhf_mld = (lhf*86400)/(mld*1024*4000),
+         shf_mld = (shf*86400)/(mld*1024*4000),
+         mld_1 = 1/mld) %>% 
+  pivot_longer(cols = c(-lon, -lat, -depth, -t), names_to = "var", values_to = "val")
 
 # Calculate all clims and anoms
 # Also give better names to the variables
@@ -229,8 +259,8 @@ is_all_anom <- ALL_ts %>%
          lhf_mld = (lhf*86400)/(mld*1024*4000),
          shf_mld = (shf*86400)/(mld*1024*4000),
          mld_1 = 1/mld) %>% 
-  pivot_longer(cols = c(-region, -t), names_to = "var", values_to = "val") %>% 
-  group_by(region, var) %>%
+  pivot_longer(cols = c(-lon, -lat, -depth, -t), names_to = "var", values_to = "val") %>% 
+  group_by(lon, lat, var) %>%
   nest() %>%
   mutate(clims = map(data, ts2clm, y = val, roundClm = 10,
                      climatologyPeriod = c("1993-01-01", "2018-12-25"))) %>% 
@@ -247,19 +277,19 @@ saveRDS(ALL_ts_anom, "shiny/ALL_ts_anom.Rda")
 # is_mini <- filter(is_GLORYS, lon == lon[1], lat == lat[1]) # For testing
 registerDoParallel(cores = 15)
 system.time(
-  is_GLORYS_anom <- plyr::ddply(is_GLORYS, c("lon", "lat", "depth", "variable"), calc_clim_anom,
-                                .parallel = T, .paropts = c(.inorder = FALSE),
-                                base_line = c("1993-01-01", "2022-12-31"), point_accuracy = 6)
+  is_all_anom <- plyr::ddply(is_all, c("lon", "lat", "depth", "variable"), calc_clim_anom,
+                             .parallel = T, .paropts = c(.inorder = FALSE),
+                             base_line = c("1993-01-01", "2022-12-31"), point_accuracy = 6)
 ) # 5 seconds for 1 pixel with 26 depths, 969 seconds for all
-data.table::fwrite(is_GLORYS_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv")
-saveRDS(is_GLORYS_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.Rda")
-if(!exists("is_GLORYS_anom")) is_GLORYS_anom <- data.table::fread("~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv"); gc()
+data.table::fwrite(is_all_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv")
+saveRDS(is_all_anom, "~/pCloudDrive/FACE-IT_data/GLORYS/is_all_anom.Rda")
+if(!exists("is_all_anom")) is_GLORYS_anom <- data.table::fread("~/pCloudDrive/FACE-IT_data/GLORYS/is_GLORYS_anom.csv"); gc()
 
 # test visual
-is_GLORYS_anom |> filter(t == "1997-01-01", variable == "siconc") |> 
+is_all_anom |> filter(t == "1997-01-01", variable == "siconc") |> 
   ggplot(aes(x = lon, y = lat)) + geom_tile(aes(fill = value)) + scale_fill_viridis_c() +
   coord_quickmap(xlim = bbox_is[1:2], ylim = bbox_is[3:4], expand = T)
-is_GLORYS_anom |> filter(t == "2010-01-18", variable == "siconc") |> 
+is_all_anom |> filter(t == "2010-01-18", variable == "siconc") |> 
   ggplot(aes(x = lon, y = lat)) + geom_tile(aes(fill = anom)) +
   scale_fill_gradient2(low = "blue", high = "red") +
   coord_quickmap(xlim = bbox_is[1:2], ylim = bbox_is[3:4], expand = T)
